@@ -1,0 +1,27 @@
+name: Keep Docker Running 24/7
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "*/30 * * * *"  # Runs every 30 minutes to ensure uptime
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH and Deploy
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" > private_key && chmod 600 private_key
+          ssh -o StrictHostKeyChecking=no -i private_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+            # Restart if stopped, otherwise keep running
+            docker stop ubuntu_vnc || true
+            docker rm ubuntu_vnc || true
+            docker pull dorowu/ubuntu-desktop-lxde-vnc
+            docker run -d --restart always --name ubuntu_vnc -p 6070:80 dorowu/ubuntu-desktop-lxde-vnc
+          EOF
